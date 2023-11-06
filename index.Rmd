@@ -1,5 +1,6 @@
 ---
 title: "IODS course project"
+author: "Roni Koitermaa"
 output:
   html_document:
     theme: cosmo
@@ -8,6 +9,7 @@ output:
     fig_caption: true
     fig_width: 6
     fig_height: 4
+bibliography: bibliography.bib
 ---
 
 ***
@@ -19,7 +21,8 @@ output:
 ```
   
 ***
-  
+
+<!--
 ```{r child = "chapter2.Rmd"}
 # This will include Chapter 2 (that is updated in its own file) in the document.
 ```
@@ -27,4 +30,4 @@ output:
 ***
 
 (more chapters to be added similarly as we proceed with the course!)
-
+-->

@@ -1,13 +1,27 @@
 
 # About the project
 
-*Write a short description about the course and add a link to your GitHub repository here. This is an R Markdown (.Rmd) file so you should use R Markdown syntax.*
+Introduction to Open Data Science is a course combining open data, open science and data science. The course aims to provide tools and techniques for visualizing, analyzing and interpreting data using the methods of data science. Open research tools such as R, R Markdown and RStudio are used to produce dynamic and reproducible reports combining text and R code, which are published on GitHub pages. Reproducible research makes scientific research transparent by providing access to both data and code, which allows anyone to evaluate how data analysis has been done.
 
-```{r}
-# This is a so-called "R chunk" where you can write R code.
+These pages are a learning diary to document progress on the course.
 
-date()
+GitHub pages: [https://roninkoi.github.io/IODS-project](https://roninkoi.github.io/IODS-project) \
+GitHub repository: [https://github.com/Roninkoi/IODS-project](https://github.com/Roninkoi/IODS-project)
 
-```
-The text continues here.
+## Initial thoughts
 
+I found out about this course from the doctoral school mailing list, and thought it would help me improve my data analysis skills and teach me how to make scientific research more open. I'm interested in learning R, and this course is a good chance to do so. I have been using Python with Matplotlib/NumPy/SciPy to visualize and analyze data previously, so I'm curious to see the benefits of using R.
+
+## Learning R
+
+After reading chapters 1-4 of R for Health Data Science [@rhds], I have found it to be a useful introduction to R so far. It's very good that this book is openly available and itself written using R. It focuses quite heavily on practical examples, which has been good for learning. I had the most difficulty with chapter 2 on R basics. The way some things are done in R seemed a bit unusual and opaque. I was most interested in finding out how R differs from other languages, since I'm familiar with most basic concepts. The most interesting chapter so far has been chapter 4 on plotting, and I've always found making plots to be fun.
+
+The RStudio IDE makes working with R and R Markdown easy, but I personally find it a bit clumsy compared to a simple text editor. The main benefit of RStudio has been easy editing of R Markdown, with the ability to evaluate single R blocks and visualization of the results (tables, plots).
+
+## Completed tasks
+
+- [x] Installed R and RStudio, forked IODS-project repository [@iodsgit], set up GitHub pages
+- [x] Write chapter1.Rmd
+- [x] Add author to index.Rmd
+- [x] Created GitHub access token
+- [x] Commit and push to GitHub

@@ -11,7 +11,7 @@ GitHub repository: [https://github.com/Roninkoi/IODS-project](https://github.com
 
 I found out about this course from the doctoral school mailing list, and thought it would help me improve my data analysis skills and teach me how to make scientific research more open. I'm interested in learning R, and this course is a good chance to do so. I have been using Python with Matplotlib/NumPy/SciPy to visualize and analyze data previously, so I'm curious to see the benefits of using R.
 
-## Learning R, week 1
+## Learning R (week 1)
 
 After reading chapters 1-4 of R for Health Data Science [@rhds], I have found it to be a useful introduction to R so far. It's very good that this book is openly available and itself written using R. It focuses quite heavily on practical examples, which has been good for learning. I had the most difficulty with chapter 2 on R basics. The way some things are done in R seemed a bit unusual and opaque. I was most interested in finding out how R differs from other languages, since I'm familiar with most basic concepts. The most interesting chapter so far has been chapter 4 on plotting, and I've always found making plots to be fun.
 

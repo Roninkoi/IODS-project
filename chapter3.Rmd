@@ -10,22 +10,54 @@ library(GGally)
 require(gridExtra)
 require(docxtools)
 library(ggcorrplot)
+library(boot)
 ```
 
-```{r message=FALSE, warning=FALSE}
+Logistic regression allows us to predict discrete outcomes based on explanatory 
+variables, as opposed to linear regression where the output of the model is
+continuous [@islr]. An example of this would be whether a student passes a class
+(true/false), while in linear regression we could predict the grade of the student.
+However, simple linear regression is not very suitable for classification tasks
+as it is not very reliable.
+Logistic regression instead models the conditional probability $p(X)$ of an outcome given 
+the explanatory variables $X$ as $\exp\left(\frac{\hat p(X)}{1 - \hat p(X)}\right) = \hat f(X)$, which is then used to determine whether that outcome
+is likely to occur or not.
+
+We are using student performance data^[http://www.archive.ics.uci.edu/dataset/320/student+performance] from questionnaires and school reports to model student alcohol consumption based on data about the background and academic performance of the students. The data contains variables such as age, sex, academic performance (grades, attendance, failures), family background (job, education, support), personal data (health, alcohol consumption, how much going out with friends) amond other variables. All of the variables in the data set are printed in the code snippet below. This data gives an overview on the life of each student, which can be used to predict habits such as alcohol consumption. The students will be classified into two groups: low alcohol use and high alcohol use. High alcohol use is defined as the mean of weekday and and weekend alcohol use exceeding some limit (2). To generate the data set, we use the R script [`data/create_alc.R`](https://github.com/Roninkoi/IODS-project/blob/master/data/create_alc.R). This script joins two data sets, collected from mathematics and Portuguese language students, to create a single data set consisting of students attending both classes. The data sets are joined by identifying each student using the background questions, and calculating the mean of the grades (and other class-specific variables) of the two classes for each student. The resulting data set better captures the academic performance of each student across subjects. The final data set consists of 35 variables and 370 students.
+
+```{r warning=FALSE}
 # load data set
-alc <- read_csv("./data/alc.csv")
+alc <- read_csv("./data/alc.csv", show_col_types = F)
 
 # variables in the data set
+message("Variables:")
 print(colnames(alc))
+
+n_men <- nrow(filter(alc, sex == "M"))
+n_women <- nrow(filter(alc, sex == "F"))
+message("Number of students: ", n_men+n_women, " (", n_men, " men, ", n_women, " women)")
 ```
+
+We will pick `sex` (M/F), `goout` (how much student goes out with friends), `absences` (number of school absences) and `G3` (final exam score) as the explanatory variables for our logistic regression model. We hypothesize that `G3` of each student is negatively correlated with alcohol consumption, and `goout` and `absences` are positively correlated. The students who drink a lot would be going out with their friends a lot, while attending school less than their peers who drink little. Social drinking when going out with friends would increase the alcohol consumption for these students. This would be associated with a lower final score, as the students are perhaps less interested in studying (and more interested in partying). We additionally hypothesize that there are more male heavy drinkers and fewer female heavy drinkers. This gives us 4 explanatory variables (`sex`, `goout`, `absences` and `G3`) to predict whether a student is a heavy drinker `high_use` (true/false).
 
 ```{r cm, message=FALSE, warning=FALSE, fig.cap="Correlation matrix for student alcohol consumption data set.\\label{fig:cm}", fig.align="center", fig.width=12, fig.height=12}
 model.matrix(~0+., data=alc) %>% 
   cor(use="pairwise.complete.obs") %>% 
   ggcorrplot(show.diag=FALSE, type="lower", lab=TRUE, lab_size=2)
 ```
-```{r bp, message=FALSE, warning=FALSE, fig.cap=".\\label{fig:bp}", fig.align="center", fig.width=15, fig.height=8}
+
+We examine the relationships between variables in the data as well as our chosen
+model by plotting the correlation matrix (figure \@ref(fig:cm)). In this matrix, 
+the correlation coefficients between variables in the data set are visualized (red = positive, blue = negative). The correlation coefficients for the variables in our chosen model are:
+$$
+\rho_{\text{high_use},\text{sex (M)}} = 0.21, \
+\rho_{\text{high_use},\text{goout}} = 0.36, \\
+\rho_{\text{high_use},\text{absences}} = 0.22, \
+\rho_{\text{high_use},\text{G3}} = -0.13.
+$$
+This suggests that the most significant variable in our model predicting high alcohol use is how often students go out with their friends, followed by the number of absences. This suggests that social drinking with friends contributes significantly to the alcohol intake of the students, possibly resulting in absences. In the group of heavy drinkers, a significant majority are men. These observations are in agreement with our previous hypothesis. The final exam score is negatively correlated with high alcohol use, but the correlation is perhaps less significant than initially thought. The number of failures, amount of study time and free time have higher correlation coefficients, so the final exam score may be a worse predictor of alcohol use. It should be noted that high alcohol use is most highly correlated with mean alcohol use and weekday/weekend alcohol use, as it is defined using those variables, so these variables will not be included in any model.
+
+```{r bp, message=FALSE, warning=FALSE, fig.cap="Distributions and box plots for different variables.\\label{fig:bp}", fig.align="center", fig.width=15, fig.height=8}
 h1 <- ggplot(alc, aes(x = goout, fill = high_use)) + 
    geom_histogram(alpha = 0.7) + ylab("Density") + 
   ggtitle("Go out by alcohol consumption") + 
@@ -49,27 +81,206 @@ b3 <- ggplot(alc, aes(x = high_use, y = G3, col = sex)) + geom_boxplot() +
 grid.arrange(h1, h2, h3, b1, b2, b3, ncol=3, nrow=2)
 ```
 
-```{r}
-model <- glm(high_use ~ sex + goout + absences + G3, data = alc, 
-             family = "binomial")
-summary(model)
+The distributions and box plots are for our chosen variables are shown in figure \@ref(fig:bp). About 53% of students are female, so there are roughly equal numbers of male and female students. Looking at the distributions, we can see that the students who are heavy drinkers tend to go out more, tend to have more absences and tend to have lower exam scores. In the case of `goout` and `absences`, the variance of the distributions appears larger. The median final exam scores for light drinkers and heavy drinkers looks about the same, though the distributions look quite different. High-scoring students tend to be mostly light drinkers. The exam score distribution for heavy drinkers has many peaks, but this may be because there are fewer heavy drinkers. The box plots show these variables separated by sex. Overall, high alcohol consumption appears to affect men more than women, as there are greater differences between men that are light drinkers and men that are heavy drinkers. Notably, for women the median number of absences and test score appears to be the same, while for men alcohol consumption has a more negative impact. Additionally, alcohol use appears to change the variability of results for the different groups.
 
-model <- glm(high_use ~ sex + goout + absences, data = alc, 
-             family = "binomial")
-summary(model)
+We fit a logistic regression model using our 4 chosen parameters using the function `glm()` with the parameter `family = "binomial"`. Since we have a factor variable `sex`, we subtract 1 from the formula to get separate coefficients for each sex. For the coefficients, we calculate the odds ratios (OR) and confidence intervals (CI) by exponentiating the output from the functions `coef()` and `confint()` respectively. The odds ratio tells us how much the outcome probability is affected by each coefficient. The full summary of the fitted model with coefficients, errors and $p$-values is shown in table \@ref(tab:su). The $p$-values are calculated based on the Wald test.
 
+Based on the odds ratios, the most significant variables contributing to high 
+alcohol use are `goout` followed by `absences`. For men, the OR
+is larger than for women, so being men are much more likely to be heavy drinkers. This agrees with our previous
+observations for these parameters, and agrees with our hypothesis. 
+The exam score `G3` OR is less than 1, so
+a higher exam score decreases the probability of high alcohol use as per our
+previous observations. The $p$-values for the `sex`, `goout` and `absences`
+variables are all statistically significant ($< 0.05$), while the `G3` $p$-values
+are not. This disagrees with our hypothesis that the final exam score predicts
+alcohol use.
+
+```{r su, message=FALSE, warning=FALSE}
+# fit logistic regression
+model <- glm(high_use ~ sex + goout + absences + G3 - 1, data = alc, 
+             family = "binomial")
+model_summary <- summary(model)
+
+# exponentiate coefficients to get odds ratio (and confidence interval)
+odds_ratio <- coef(model) %>% exp
+conf_int <- confint(model) %>% exp
+
+fe <- data.frame("Variable"=c("Sex (F)", "Sex (M)", 
+                         "Go out", "Absences", 
+                         "G3"),
+                 "Coefficient"=c(model_summary$coefficients[1,1], 
+                         model_summary$coefficients[2,1], 
+                         model_summary$coefficients[3,1], 
+                         model_summary$coefficients[4,1], 
+                         model_summary$coefficients[5,1]),
+                 "Std.error"=c(model_summary$coefficients[1,2], 
+                         model_summary$coefficients[2,2], 
+                         model_summary$coefficients[3,2], 
+                         model_summary$coefficients[4,2], 
+                         model_summary$coefficients[5,2]),
+                 "P-value"=c(model_summary$coefficients[1,4], 
+                         model_summary$coefficients[2,4], 
+                         model_summary$coefficients[3,4], 
+                         model_summary$coefficients[4,4], 
+                         model_summary$coefficients[5,4]),
+                 "OR"=c(odds_ratio[1], 
+                         odds_ratio[2], 
+                         odds_ratio[3], 
+                         odds_ratio[4], 
+                         odds_ratio[5]),
+                 "CI2.5"=c(conf_int[1,1], 
+                         conf_int[2,1], 
+                         conf_int[3,1], 
+                         conf_int[4,1], 
+                         conf_int[5,1]),
+                 "CI97.5"=c(conf_int[1,2], 
+                         conf_int[2,2], 
+                         conf_int[3,2], 
+                         conf_int[4,2], 
+                         conf_int[5,2]))
+fe <- format_engr(fe)
+kable(fe, caption = "Fit summary for model with 4 parameters.")
+```
+
+We fit the model again, this time with only the variables `sex`, `goout` and `absences`.
+Now all of the variables in our model has a statistically significant relationship
+with alcohol use. Using this model, we predict the response for the training
+data and calculate the training loss as $L_\text{train} = \text{E}[|\text{high_use}-p_\text{high_use}| > 0.5]$, where $\text{high_use}$ is the training data and $p_\text{high_use}$ is the model output probability. The training loss represents the fraction of students that were misclassified. For our model with 3 parameters, we get $L_\text{train} = 0.2108$, which means that the model classifies the alcohol use of students with 79% accuracy. According to the cross tabulation of predictions vs. actual values in table \@ref(tab:ct), we can see that the model is underestimating the number of heavy drinkers. It most commonly misclassifies students that are heavy drinkers as light drinkers. This is nonetheless significantly better than guessing (e.g. flipping a coin), which would give us a probability of $p(\text{TT} \cup \text{FF}) = 0.5 \times 0.7 + 0.5 \times 0.3 = 0.5$. We also calculate this random guess loss `random_err` in the code below, which gives a 50% error for random guessing.
+
+The values for `high_use` and predictions from the model are plotted in figure \@ref(fig:mp). Predictions with probabilities $>0.5$ are classified as `high_use`, visualized using colors. We can see how the prediction errors for heavy drinkers are visible in this plot.
+
+```{r ct, message=FALSE, warning=FALSE}
+# fit better logistic regression model
+model <- glm(high_use ~ sex + goout + absences - 1, data = alc, 
+             family = "binomial")
+model_summary <- summary(model)
+
+# loss function
+loss <- function(data, fit) mean(abs(data - fit) > 0.5)
+
+# add predicted values for data set
 alc_model <- data.frame(high_use=alc$high_use,
                         high_use_prob=predict(model, type = "response"))
 alc_model <- mutate(alc_model, high_use_predict=high_use_prob>0.5)
 
+# calculate prediction error for random guess
+n_rand <- 100
+random_err <- 0
+for (i in 1:n_rand) {
+  alc_random <- data.frame(high_use=alc$high_use,
+                          high_use_prob=runif(nrow(alc), 0.0, 1.0))
+  alc_random <- mutate(alc_random, high_use_predict=high_use_prob>0.5)
+  
+  random_err <- random_err + 
+    loss(alc_random$high_use, alc_random$high_use_prob) / n_rand
+}
+
+# cross tabulation
+cross_tab <- table(high_use = alc_model$high_use, 
+      prediction = alc_model$high_use_predict) %>% prop.table %>% addmargins
+
+# training error
+train_err <- loss(alc_model$high_use, alc_model$high_use_prob)
+
+message("Train err: ", train_err, ", random: ", random_err)
+
+kable(data.frame(Prediction.FALSE=cross_tab[,1],
+                 Prediction.TRUE=cross_tab[,2],
+                 Sum=cross_tab[,3]), caption = "Cross tabulation.")
+```
+```{r mp, message=FALSE, warning=FALSE, fig.cap="Actual values for alcohol use vs. predicted.\\label{fig:mp}", fig.align="center", fig.width=8, fig.height=6}
 ggplot(alc_model, aes(x = high_use_prob, 
                      y = high_use, col = high_use_predict)) + 
   geom_point() + scale_color_brewer(palette="Set2")
-
-table(high_use = alc_model$high_use, 
-      prediction = alc_model$high_use_predict) %>% prop.table %>% addmargins
-
-train_err <- mean(abs(alc_model$high_use - alc_model$high_use_prob) > 0.5)
-train_err
 ```
 
+To get a better estimate for the error (using the training set) for our model, we use 10-fold cross-validation (CV). The function
+`cv.glm()` is used with the parameter `K = 10`. This divides the test set in 10 folds, and fits the model 10 times. Since
+CV doesn't use the training set for testing, we can get a better estimate of the error by averaging.
+
+The CV error on the training for our 3-variable model is $L_\text{CV} = 0.2142$, which is larger than the training loss $L_\text{train} = 0.2108$, as is expected. The error for this model appears to be lower than that of the exercise set 3 model.
+
+```{r}
+cv_err <- 0
+n_cv <- 100
+for (i in 1:n_cv) {
+  alc_cv <- cv.glm(data = alc, 
+                   cost = loss, 
+                   glmfit = model, K = 10)
+  cv_err <- cv_err + alc_cv$delta[1] / n_cv
+}
+message("CV: ", cv_err)
+```
+
+Finally, we attempt to find a better model by running cross-validation for a 
+large number of different variables. The R code below starts from a list of some
+of the most highly correlated variables, and starts fitting models in a loop. For each fit,
+we remove the variable with the largest $p$-value from the set of fitted variables.
+This removes the worst variable from the model, so the number of parameters in the model decreases, i.e. the model flexibility decreases.
+For each of these fits, we additionally record the training loss $L_\text{train}$
+and cross-validation error $L_\text{CV}$. The refitting process is continued until
+we run out of variables.
+
+The best found model has a training loss of $L_\text{train}=0.2162$ and CV error
+$L_\text{CV}=0.2094$. This model consists of the 5 variables `sex`, `goout`, `absences`, `famrel` and `studytime`.
+All of these variables are statistically significant.
+
+The training and CV errors are plotted in figure \@ref(fig:cv). We can see the
+training error decreases with the model flexibility. The CV error decreases to a minimum
+at $5$ parameters, before starting to increase again. These results are a consequence of
+the bias-variance tradeoff. As model flexiblity increases, bias decreases and variance increases.
+The training error approaches 0 as the bias decreases, but the testing error is
+a combination of both factors. The CV error approximates the test error, which is
+why we see a minimum where both factors are balanced.
+
+```{r cv, message=FALSE, warning=FALSE, fig.cap="Training and CV error vs. model flexibilty.\\label{fig:cv}", fig.align="center", fig.width=8, fig.height=6}
+flex_err <- data.frame(matrix(nrow = 0, ncol = 3))
+
+# intial model variables to fit
+model_variables <- c("age", "sex", "goout", "failures", "absences", 
+                     "freetime", "famrel", "higher", "studytime", 
+                     "traveltime", "address", "G1", "G2", "G3")
+alc_i <- select(alc, all_of(c("high_use", model_variables))) # initial data set
+n_var <- length(model_variables)
+for (i in 1:n_var) { # loop through models
+  # fit model with all columns in alc_i
+  model_i <- glm(high_use ~ ., data = alc_i,
+             family = "binomial")
+  model_i_summary <- summary(model_i)
+  #print(model_i_summary)
+  # model flexibility
+  flex = length(model_variables)
+  
+  # get index of variable with greatest p-value (not intercept)
+  max_p <- which.max(model_i_summary$coefficients[2:(length(model_variables)+1),4])
+  if (max_p > 0) { # remove largest p-value variable from data set
+    rm_col <- model_variables[max_p]
+    model_variables <- model_variables[-max_p]
+    alc_i <- select(alc_i, -one_of(rm_col))
+  }
+  
+  # calculate training error
+  prob_i <- predict(model_i, type = "response")
+  train_err_i <- loss(alc_i$high_use, prob_i)
+  #message("Train loss: ", train_err_i)
+  
+  # calculate CV error
+  cv_err <- 0
+  n_cv <- 10
+  for (i in 1:n_cv) {
+    alc_cv <- cv.glm(data = alc_i, 
+                     cost = loss, 
+                     glmfit = model_i, K = 10)
+    cv_err <- cv_err + alc_cv$delta[1] / n_cv
+  }
+  #message("CV: ", cv_err)
+  
+  flex_err <- rbind(flex_err, data.frame(flex=flex, 
+                                         train_err=train_err_i, cv_err=cv_err))
+}
+ggplot() + 
+  geom_line(data = flex_err, aes(x = flex, y = train_err, col="Train")) +
+  geom_line(data = flex_err, aes(x = flex, y = cv_err, col="CV")) +
+  labs(x = "Flexibility", y="Error", color="Error")
+```

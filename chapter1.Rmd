@@ -17,8 +17,6 @@ After reading chapters 1-4 of R for Health Data Science [@rhds], I have found it
 
 The RStudio IDE makes working with R and R Markdown easy, but I personally find it a bit clumsy compared to a simple text editor. The main benefit of RStudio has been easy editing of R Markdown, with the ability to evaluate single R blocks and visualization of the results (tables, plots).
 
-## Week 1 tasks
-
 - [x] Installed R and RStudio, forked IODS-project repository [@iodsgit], set up GitHub pages
 - [x] Write chapter1.Rmd
 - [x] Add author to index.Rmd

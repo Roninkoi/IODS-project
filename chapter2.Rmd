@@ -20,7 +20,7 @@ to quantify the relationship $f$ between predictor variables $X$ and a response 
 using a linear model $\hat Y = \hat f(X)$ [@islr]. By fitting a model to a data
 set, we can determine the prediction $\hat Y$ by finding an estimate for $\hat f$.
 If we have the appropriate data set available, it should be possible to roughly predict
-how well a student performs using a model.
+how well a student performs using a model.^
 
 A data set on student learning was created for regression analysis. This data set
 is based on student learning data^[http://www.helsinki.fi/~kvehkala/JYTmooc/JYTOPKYS3-data.txt] collected in 2014-2015, which describes student learning attitudes and outcomes.

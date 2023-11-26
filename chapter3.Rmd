@@ -194,6 +194,8 @@ ggplot(alc_model, aes(x = high_use_prob,
   geom_point() + scale_color_brewer(palette="Set2")
 ```
 
+## Bonus
+
 To get a better estimate for the error (using the training set) for our model, we use 10-fold cross-validation (CV). The function
 `cv.glm()` is used with the parameter `K = 10`. This divides the test set in 10 folds, and fits the model 10 times. Since
 CV doesn't use the training set for testing, we can get a better estimate of the error by averaging.
@@ -211,6 +213,8 @@ for (i in 1:n_cv) {
 }
 message("CV: ", cv_err)
 ```
+
+## Super-Bonus
 
 Finally, we attempt to find a better model by running cross-validation for a 
 large number of different variables. The R code below starts from a list of some

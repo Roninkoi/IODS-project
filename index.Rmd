@@ -37,3 +37,5 @@ bibliography: bibliography.bib
 
 ```{r child = "chapter5.Rmd"}
 ```
+
+***

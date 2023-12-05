@@ -1,0 +1,173 @@
+# Dimensionality reduction (week 5)
+
+Dimensionality reduction techniques allow us to simplify the interpretation of multidimensional data and models.
+These techniques include principal component analysis (PCA) and multiple correspondence analysis (MCA), which we will use
+to reduce multidimensional data to as few components as possible.
+
+The human development and gender inequality data set ("human" data set) is created
+based on data from the United Nations Development Programme^[https://hdr.undp.org/data-center/human-development-index#/indicies/HDI].
+The R script [`create_human.R`](https://github.com/Roninkoi/IODS-project/blob/master/data/create_human.R) is used to generate the data.
+The original data sets (human development and gender inequality) consist of various indicators for different countries and regions around the world. 
+These indicators can be used to assess the development of countries in a number areas, including economic, health, education and equality.
+The two data sets (human development and gender inequality) are joined together by country, while we also exclude undefined values and regions (including only countries).
+In the final data set, we have 155 rows and the 9 variables 
+`Country`, `Edu2.FM` (female/male secondary education ratio), `Labo.FM` (female/male labour participation rate ratio), `Edu.Exp` (expected years of education), `Life.Exp` (life expectancy), `GNI` (gross national income per capita), `Mat.Mor` (maternal mortality rate), 
+`Ado.Birth` (adolescent birth rate) and `Parli.F` (percent female representation in parliament).
+
+```{r message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+library(tidyverse)
+library(knitr)
+library(caret)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+require(gridExtra)
+require(docxtools)
+#library(ggcorrplot)
+library(boot)
+library(corrplot)
+library(plotly)
+library(kableExtra)
+#library(factoextra)
+library(FactoMineR)
+```
+
+```{r message=FALSE, warning=FALSE}
+# load human development and gender inequality data set
+human <- read.csv("./data/human.csv")
+
+# move country to rownames
+human <- column_to_rownames(human, "Country")
+```
+
+```{r sm5}
+# create summary table for data set
+summary_table <- function(data, cap) {
+  data_summary <- as.data.frame(apply(data, 2, summary))
+  kable(data_summary, caption = cap, digits=2) %>%
+  kable_styling(font_size = 12)
+}
+
+# make summary of human data set
+summary_table(human, "Summary of human (development and gender inequality) data set.")
+```
+
+```{r hi5, message=FALSE, warning=FALSE, fig.width=14, fig.height=6, fig.cap="Histograms of values in human data set.\\label{fig:hi5}"}
+# plot histogram from vector
+vhist <- function(var, xlab) ggplot() + aes(var) + 
+  geom_histogram() + xlab(xlab) + ylab("Count")
+
+# plot histograms for all variables in human data set
+human_hist <- function(data) {
+  h1 <- vhist(data$Edu2.FM, "Female/male secondary education ratio")
+  h2 <- vhist(data$Labo.FM, "Female/male labour force participation ratio")
+  h3 <- vhist(data$Edu.Exp, "Expected years of education")
+  h4 <- vhist(data$Life.Exp, "Life expectancy")
+  h5 <- vhist(data$GNI, "Gross national income per capita")
+  h6 <- vhist(data$Mat.Mor, "Maternal mortality ratio")
+  h7 <- vhist(data$Ado.Birth, "Adolescent birth rate")
+  h8 <- vhist(data$Parli.F, "Female representation in parliament")
+  
+  grid.arrange(h1, h2, h3, h4, h5, h6, h7, h8, 
+               ncol=4, nrow=2)
+}
+
+# plot histogram of variables
+human_hist(human)
+```
+
+A summary of the variables in the human data set is given in table \@ref(tab:sm5). We can see that the GNI variable has a much larger absolute range than the other variables (which are years or ratios), since this this variable represents currency. The income inequality between countries is quite large [581, 123124]. There are also quite large differences in maternal mortality [1, 1100], adolescent birth rate [0.6, 204.8] and life expectancy [49, 84]. Relative differences in gender equality are also large between countries (`Edu2.FM`, `Labo.FM` and `Parli.F`), since in some countries there are few women with secondary education, women in the labour force and in parliament, while in some countries women are the majority. The distributions of the variables are given in figure \@ref(fig:hi5). We can see that the female/male secondary education ratio has a median close to 1 (and a sharp peak in the distribution), so it appears to be common that women and men have similar levels of secondary education. However, the female/male labour participation ratio and female representation in parliament distributions are wider. There are some countries where female labour participation is low and in most countries female representation in parliament is much less than 50% (median 20%). Expected years of education is fairly normally distributed (mean 13 years) and life expectancy in most countries is fairly high, with a few countries with very low life expectancy. The GNI, maternal mortality and adolescent birth rate show fairly similar distributions, with few countries at the top end and many at the lower end.
+
+Correlations between variables in the human data set are plotted in figure \@ref(fig:cm5). The most positive correlation is between life expectancy and expected years of education (0.79), while the most negative correlation is between is between life expectancy and maternal mortality. Each of these is also highly correlated with GNI, so it could be that the wealth of a country results in more years of education, longer life expectancy and lower maternal mortality. Each of the variables `Edu.Exp`, `Life.Exp`, `GNI`, `Mat.Mor` and `Ado.Birth` is significantly correlated with each other, so these are likely connected to each other. Additionally, these variables are significantly correlated with `Edu2.FM` (positively: `Edu.Exp`, `Life.Exp`, `GNI`). Interestingly, the correlations for `Labo.FM` and `Parli.F` are weaker, so it could be that gender equality is not as directly associated with wealth or education level. It seems that the secondary education of women doesn't directly correlate with parliament representation, while labour force participation and expected years of education do.
+
+```{r cm5, message=FALSE, warning=FALSE, fig.width=8, fig.height=8, fig.cap="Correlation matrix of human data set with correlation coefficients and $p$-values.\\label{fig:cm5}"}
+human_cor <- cor(human) %>% round(digits = 2)
+
+human_conf <- cor.mtest(human, conf.level = .95)
+human_p <- human_conf$p
+human_p[lower.tri(human_p, diag = T)] <- 1
+
+corrplot.mixed(human_cor, 
+         p.mat = human_p,
+         upper = "circle",
+         lower = "number",
+         insig = "label_sig",
+         pch.col = "black",
+         pch.cex = 1.0,
+         lower.col = "black",
+         sig.level = c(.001, .01, .05))
+```
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+# perform principal component analysis on unstandardized data
+human_pca <- prcomp(human)
+human_pca_summary <- summary(human_pca)
+human_pca_var <- round(100*human_pca_summary$importance[2, ], digits = 2)
+human_pca_summary
+human_pca$rotation
+
+# standardize human data set
+human_scaled <- scale(human)
+
+# perform principal component analysis on standardized data
+human_scaled_pca <- prcomp(human_scaled)
+human_scaled_pca_summary <- summary(human_scaled_pca)
+human_scaled_pca_var <- round(100*human_scaled_pca_summary$importance[2, ], 
+                              digits = 2)
+human_scaled_pca_summary
+human_scaled_pca$rotation
+```
+
+```{r pca5, message=FALSE, warning=FALSE, fig.width=10, fig.height=10, fig.cap="PCA biplots for unstandardized (left) and standardized (right) data. The PC1 component describes the wealth (`GNI`, `Edu.Exp`, `Edu2.FM`) or health (`Life.Exp`, `Mat.Mor`, `Ado.Birth`) of a country, while the PC2 component is a measure of female representation (`Labo.FM`, `Parli.F`).\\label{fig:pca5}"}
+par(mfrow=c(1, 2))
+
+# plot PCA (unstandardized)
+pca_label <- paste0(names(human_pca_var), " (", human_pca_var, "%)")
+biplot(human_pca, choices = 1:2, 
+       cex = c(0.8, 1), col = c("grey40", "deeppink2"),
+       xlab = paste0(pca_label[1], ", wealth"), 
+       ylab = pca_label[2])
+# plot PCA (standardized)
+pca_label <- paste0(names(human_scaled_pca_var), " (", human_scaled_pca_var, "%)")
+biplot(human_scaled_pca, choices = 1:2, 
+       cex = c(0.8, 1), col = c("grey40", "deeppink2"),
+       xlab = paste0(pca_label[1], ", wealth / health"), 
+       ylab = paste0(pca_label[2], ", female representation"))
+```
+We perform principal component analysis (PCA) on the human data set using the function `prcomp()`. This separates the multidimensional data into its principal components, such that PC1 accounts for most of the variance, followed by PC2 and so on. These two principal components are plotted as biplot with the variable contributions visualized as arrows and component contributions in axis labels (percent). In figure \@ref(fig:pca5), we have the PCA biplots for the unstandardized human data set (left) and for the standardized human data set (right). In the standardized case, we first scale the variables to $\mu=0, \sigma = 1$.
+
+For the unstandardized PCA, we can only see one component that accounts for a significant amount of the variance in the data: `GNI` (99.99%). This is because the data set is unstandardized, so the different scales of each variable are not accounted for. When we do the PCA, the scaling of the variables will affect the determination of components. Since `GNI` has the largest range, it is determined to account for 99.99% of the variance. When we standardize the data set, all of the variables are scaled to the same range, which makes their variances comparable with each other. 
+
+For the standardized PCA, there are two principal components that account for about 70% of the variance in the data: PC1 (`GNI`, `Edu.Exp`, `Edu2.FM`, `Life.Exp`, `Mat.Mor`, `Ado.Birth`) accounting for 53.61% and PC2 (`Labo.FM`, `Parli.F`) accounting for 16.24%. The PC1 component could be interpreted roughly as a dimension of wealth or health of a country. The wealth of a country (`GNI`) is associated with the level of education (`Edu.Exp`, `Edu2.FM`) in that country, as well as the level of healthcare (`Life.Exp`, `Mat.Mor`, `Ado.Birth`). In countries with better healthcare, there are longer life expectancies and lower maternal mortality (access to treatment) and lower adolescent birthrates (family planning). The PC2 component is a more social dimension, perhaps measuring the representation of women (`Labo.FM`, `Parli.F`) in significant positions in society, like the labour force or leadership of the country. This is not necessarily a good measure of gender equality/inequality, but it may be one component of it. For example, in poor countries women may be forced to work simply because they have no choice, while they may not have gender equality in those countries. The parliament representation is perhaps a better measure of gender equality, since it suggests that women are elected to parliament and thus chosen by the people to represent them. We can see that the `Labo.FM` and `Parli.F` variables are not as closely correlated as the other variables, so this could suggests that they could be separated into components of their own. We can see that the distribution of countries that have high female representation have been separated into two groups: "wealthy" countries (low PC1) and "poor" countries (high PC1). We have "wealthy" countries (Norway, Denmark, Iceland) that have the same amount of "female representation" as "poor" countries (Zimbabwe, Mozambique, Uganda), but presumambly these two groups are very different when it comes to gender equality. This is possibly caused by the difference in `Parli.F` and `Labo.FM`, so the type of "female representation" in each group may be different.
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+# load tea data set
+tea <- read.csv("https://raw.githubusercontent.com/KimmoVehkalahti/Helsinki-Open-Data-Science/master/datasets/tea.csv", stringsAsFactors = TRUE)
+# explore dimensions and structure of tea data set
+dim(tea)
+str(tea)
+View(tea)
+
+# select certain variables
+tea <- dplyr::select(tea, c("Tea", "How", "how", "price", "sugar", "age_Q", "sex", "frequency", "SPC"))
+```
+```{r th5, message=FALSE, warning=FALSE, fig.width=8, fig.height=8, fig.cap="Distributions of tea variables.\\label{fig:th5}"}
+pivot_longer(tea, cols = everything()) %>% 
+  ggplot(aes(value)) + facet_wrap("name", scales = "free") +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+```
+
+We use the tea data set from the FactoMineR package to perform multiple correspondence analysis (MCA). This data set consists of 300 rows with 34 variables of questions about how people drink their tea (frequency, milk/sugar, time of day, ...), what tea (type, price, ...) and personal details (age, sex, job, ...).
+We choose 9 variables of these to analyze: `age_Q` (age quantile), `frequency` (frequency of tea drinking), `how` (how the tea is packaged), `How` (how the tea is taken), `price` (price category of the tea), `sex` (sex of the respondent), `SPC` (employment position), `sugar` (tea taken with sugar), `Tea` (type of tea).
+
+The distributions of the tea data set variables are shown in figure \@ref(fig:th5). We can see that most people interviewed are women aged 15-24 who are students. Most drink Earl Grey tea (variable price, tea bag) by itself with no sugar two times per day or more.
+
+```{r mca5, message=FALSE, warning=FALSE, fig.width=8, fig.height=8, fig.cap="MCA plot to tea data.\\label{fig:mca5}"}
+# multiple correspondence analysis
+tea_mca <- MCA(tea, graph = FALSE)
+# plot variables
+plot(tea_mca, invisible=c("ind"), graph.type = "classic", habillage = "quali")
+```
+
+The MCA results are shown in figure \@ref(fig:mca5). We can see that the different variables are separated quite evenly in both dimensions. There is some clustering, and the different quadrants could be vaguely thought to correspond to different groups of tea drinkers. Age and employment position are quite clearly clustered, with `15-24` `student`s in the lower left, `25-34` `workman`/`employee`s in the top left, `35-44`/`44-59` `middle`/`senior`/`other worker`s in the top right and `+60` `non-worker`s in the lower right. These appear to correspond to different demographics, who may have their own tastes in tea. The younger people seem to drink `Earl Grey` with sugar, while older people drink `green`/`black` tea without sugar, and these variables are separated quite well in dimension 1. Tea with `milk` is most commonly preferred by working age people, while older people drink their tea some `other` way. Old `non-worker` people seem to drink `p_cheap` tea, while middle-aged people would drink more `p_upscale` tea that is `unpackaged`. This is perhaps because middle-aged people would have more disposable income to spend on tea. Working age people appear to drink tea once per day or less than once per day, while those not working would drink twice per day or more. It could be that workers don't have the time to drink more tea during their day. Male and female tea drinkers are mostly separated in dimension 2.

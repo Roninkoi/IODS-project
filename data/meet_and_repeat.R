@@ -31,7 +31,9 @@ str(rats)
 summary(rats)
 
 # convert to categorical variables
+bprs$subject <- as.factor(bprs$subject)
 bprs$treatment <- as.factor(bprs$treatment)
+rats$ID <- as.factor(rats$ID)
 rats$Group <- as.factor(rats$Group)
 
 # convert BPRS to long form, sort by week
